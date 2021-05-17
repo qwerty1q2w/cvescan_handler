@@ -1,0 +1,78 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+import json
+import os
+import sys
+import syslog
+import socket
+import argparse
+from datetime import datetime
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-o", "--output", required=True)
+parser.add_argument("-rp", "--report_path", required=True)
+parser.add_argument("-s", "--syslog", required=False)
+parser.add_argument("-p", "--port", required=False)
+args = parser.parse_args()
+
+with open("/etc/os-release") as f:
+    dict_os_release = {}
+    for line in f:
+        k,v = line.rstrip().split("=")
+        dict_os_release[k] = v
+
+host = os.uname()[1]
+os_version = (dict_os_release['VERSION_ID']).strip('\"')
+
+deb_list = {}
+lines = os.popen('dpkg -l | grep "^ii"').read().split('\n')[0:-1]
+i = 0
+while len([l for l in lines[i].split('  ') if l]) != 5:
+   i += 1
+offsets = [lines[i].index(l) for l in lines[i].split('  ') if len(l)]
+
+for line in lines:
+    parsed = []
+    for i in range(len(offsets)):
+        if len(offsets) == i + 1:
+            parsed.append(line[offsets[i]:].strip())
+        else:
+            parsed.append(line[offsets[i]:offsets[i + 1]].strip())
+    deb_list.update({parsed[1].split(':')[0]:parsed[2]})
+
+with open(args.report_path) as json_file:
+    data = json.load(json_file)
+    arr = json.dumps(data, sort_keys=True)
+pkgs = {}
+
+ddd = json.loads(arr)
+
+def send_report():
+    if args.output == 'file':
+        log = open('/var/log/vulners.log', 'a')
+        for cve, values in ddd['cves'].items():
+            for s, f in values.items():
+                if s == 'packages':
+                    for a, g in f.items():
+                        my_date = datetime.now()
+                        try:
+                            pkgs.update({'timestamp':my_date.isoformat(), 'cve_id':cve, 'host_name':host,'pkg_name':a,'priority':g['priority'],'installed_ver':deb_list[str(a)],'fixed_ver':g['fixed_version'],'os':os_version})
+                            log.write(str(json.dumps(pkgs,sort_keys=True)) + '\n')
+                        except Exception as ex:
+                            syslog.syslog(syslog.LOG_ERR, str(ex))
+        log.close()
+    elif args.output == 'syslog':
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        for cve, values in ddd['cves'].items():
+            for s, f in values.items():
+                if s == 'packages':
+                    for a, g in f.items():
+                        my_date = datetime.now()
+                        try:
+                            pkgs.update({'timestamp':my_date.isoformat(), 'cve_id':cve, 'host_name':host,'pkg_name':a,'priority':g['priority'],'installed_ver':deb_list[str(a)],'fixed_ver':g['fixed_version'],'os':os_version})
+                            sock.sendto(json.dumps(pkgs,sort_keys=True).encode(), (args.syslog, int(args.port)))
+                        except Exception as ex:
+                            syslog.syslog(syslog.LOG_ERR, str(ex))
+
+
+send_report()

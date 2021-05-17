@@ -1,0 +1,1 @@
+0 3 * * * root /usr/local/bin/cvescan --priority all --json > /var/log/vulners_report; /usr/bin/python3 /usr/local/bin/cvescan_handler -o file -rp /var/log/vulners_report

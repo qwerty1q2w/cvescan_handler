@@ -1,0 +1,8 @@
+Package: ext-cvescan
+Version: 1.0
+Section: unknown
+Priority: optional
+Architecture: amd64
+Essential: no
+Maintainer: dmitrii.pushkarev <ds.pushkarev@gmail.com>
+Description: Ext cvescan
