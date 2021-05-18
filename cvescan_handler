@@ -41,16 +41,14 @@ for line in lines:
     deb_list.update({parsed[1].split(':')[0]:parsed[2]})
 
 with open(args.report_path) as json_file:
-    data = json.load(json_file)
-    arr = json.dumps(data, sort_keys=True)
-pkgs = {}
+    data_json = json.loads(json.dumps(json.load(json_file), sort_keys=True))
 
-ddd = json.loads(arr)
+pkgs = {}
 
 def send_report():
     if args.output == 'file':
         log = open('/var/log/vulners.log', 'a')
-        for cve, values in ddd['cves'].items():
+        for cve, values in data_json['cves'].items():
             for s, f in values.items():
                 if s == 'packages':
                     for a, g in f.items():
@@ -63,7 +61,7 @@ def send_report():
         log.close()
     elif args.output == 'syslog':
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        for cve, values in ddd['cves'].items():
+        for cve, values in data_json['cves'].items():
             for s, f in values.items():
                 if s == 'packages':
                     for a, g in f.items():
@@ -73,6 +71,5 @@ def send_report():
                             sock.sendto(json.dumps(pkgs,sort_keys=True).encode(), (args.syslog, int(args.port)))
                         except Exception as ex:
                             syslog.syslog(syslog.LOG_ERR, str(ex))
-
 
 send_report()
